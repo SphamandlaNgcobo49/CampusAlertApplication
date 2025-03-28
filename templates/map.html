@@ -1,0 +1,162 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Location of the Reporter</title>
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBllPxxnyKCluVGeT_GE7Bep8Gz4dblQ9Q"></script>
+    <script>
+        let map, marker, watchId;
+        let isTracking = false;
+        let reportId = generateReportId();
+
+        function generateReportId() {
+            return 'report-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
+        }
+
+        function initMap() {
+            const defaultLocation = { lat: -29.8579, lng: 31.0292 }; // Default to DUT main campus
+
+            map = new google.maps.Map(document.getElementById("map"), {
+                zoom: 15,
+                center: defaultLocation,
+            });
+
+            marker = new google.maps.Marker({
+                position: defaultLocation,
+                map: map,
+                draggable: true,
+                title: "Reporter's Location",
+            });
+
+            google.maps.event.addListener(marker, 'dragend', function(event) {
+                updateLocationFields(event.latLng.lat(), event.latLng.lng());
+                if (isTracking) stopTracking();
+            });
+
+            startTracking(); // Automatically start tracking when page loads
+        }
+
+        function startTracking() {
+            if (navigator.geolocation) {
+                isTracking = true;
+                document.getElementById("trackingStatus").textContent = "Live tracking: ACTIVE";
+                document.getElementById("trackingStatus").style.color = "green";
+                
+                navigator.geolocation.getCurrentPosition(
+                    position => updatePosition(position),
+                    error => handleGeolocationError(error),
+                    { enableHighAccuracy: true }
+                );
+
+                watchId = navigator.geolocation.watchPosition(
+                    position => updatePosition(position),
+                    error => handleGeolocationError(error),
+                    { 
+                        enableHighAccuracy: true,
+                        maximumAge: 0,
+                        timeout: 5000
+                    }
+                );
+            } else {
+                alert("Geolocation not supported by this browser.");
+            }
+        }
+
+        function stopTracking() {
+            if (watchId) {
+                navigator.geolocation.clearWatch(watchId);
+                watchId = null;
+            }
+            isTracking = false;
+            document.getElementById("trackingStatus").textContent = "Live tracking: INACTIVE";
+            document.getElementById("trackingStatus").style.color = "red";
+        }
+
+        function updatePosition(position) {
+            const userLocation = {
+                lat: position.coords.latitude,
+                lng: position.coords.longitude
+            };
+
+            map.setCenter(userLocation);
+            marker.setPosition(userLocation);
+            updateLocationFields(userLocation.lat, userLocation.lng);
+            sendLocationToServer(userLocation);
+        }
+
+        function updateLocationFields(lat, lng) {
+            document.getElementById("latitude").value = lat;
+            document.getElementById("longitude").value = lng;
+        }
+
+        function handleGeolocationError(error) {
+            console.error("Geolocation error:", error);
+            alert("Unable to get your location. Please drag the marker manually.");
+            stopTracking();
+        }
+
+        function sendLocationToServer(location) {
+            console.log("Sending location update:", location);
+            // In a real implementation, this would send to your backend
+        }
+
+        setInterval(() => {
+            if (isTracking && marker.getPosition()) {
+                const pos = marker.getPosition();
+                sendLocationToServer({
+                    lat: pos.lat(),
+                    lng: pos.lng()
+                });
+            }
+        }, 30000); // Every 30 seconds
+    </script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+        }
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        #map {
+            height: 80vh;
+            width: 100%;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        #trackingStatus {
+            position: absolute;
+            bottom: 30px;
+            left: 20px;
+            background: white;
+            padding: 5px 10px;
+            border-radius: 4px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            z-index: 1000;
+            font-weight: bold;
+        }
+        .map-container {
+            position: relative;
+        }
+    </style>
+</head>
+<body onload="initMap()">
+    <h1>Location of the Reporter</h1>
+    <div class="map-container">
+        <div id="map"></div>
+        <div id="trackingStatus">Live tracking: ACTIVE</div>
+    </div>
+    
+    <!-- Hidden fields for location data -->
+    <input type="hidden" id="latitude">
+    <input type="hidden" id="longitude">
+    <input type="hidden" id="reportId" value="">
+    
+    <script>
+        document.getElementById("reportId").value = reportId;
+    </script>
+</body>
+</html>
